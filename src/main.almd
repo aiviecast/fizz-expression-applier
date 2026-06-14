@@ -1,0 +1,18 @@
+// CLI (native) — stdin の emotion 名を channel JSON に解決する。
+//   printf 'happy\njitome\nbogus\n' | fizz-expression-applier
+//   happy	[{"n":"happy","w":1},...]
+import self as ex
+import io
+import string
+
+effect fn main() -> Unit = {
+  var open = true
+  while open {
+    let line = io.read_line()
+    if string.trim(line) == "" then { open = false }
+    else {
+      let emo = string.trim(line)
+      println(emo + "\t" + ex.channels_json(emo))
+    }
+  }
+}

@@ -1,0 +1,30 @@
+import self as ex
+import list
+import string
+
+local fn near(a: Float, b: Float) -> Bool = { let d = a - b; if d < 0.0 then (0.0-d) < 0.0001 else d < 0.0001 }
+
+test "clamp01" {
+  assert(near(ex.clamp01(0.0 - 0.5), 0.0))
+  assert(near(ex.clamp01(1.5), 1.0))
+  assert(near(ex.clamp01(0.3), 0.3))
+}
+test "channels_for resolves known emotions (case-insensitive)" {
+  assert(list.len(ex.channels_for("happy")) == 7)
+  assert(list.len(ex.channels_for("HAPPY")) == 7)   // case-insensitive
+  assert(list.len(ex.channels_for("jitome")) == 4)
+  assert(list.len(ex.channels_for("bogus")) == 0)   // unknown → empty
+}
+test "first channel + a weighted fallback" {
+  let h = ex.channels_for("surprised")
+  assert((list.first(h) ?? ("", 0.0)).0 == "surprised")
+  // jitome の Angry は比率 0.15
+  let j = ex.channels_for("jitome")
+  assert(near((list.get(j, 1) ?? ("", 0.0)).1, 0.15))
+}
+test "channels_json shape" {
+  let s = ex.channels_json("blink")
+  assert(string.contains(s, "{\"n\":\"vrc.blink\",\"w\":1"))
+  assert(string.starts_with(s, "["))
+}
+

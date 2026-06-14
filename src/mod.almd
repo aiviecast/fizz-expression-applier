@@ -1,0 +1,66 @@
+// fizz_expression_applier — emotion 名 → VRM 表情/モーフ channel の対応付け + 値クランプ。
+//
+// 責務 (一行): emotion 名から、適用すべき channel (VRM プリセット名 or 生モーフ key) と
+// その重み比を返す。値は [0,1] にクランプする。
+//
+// ブラウザは各 channel を `setMorphOrExpression`(expressionManager 優先、無ければ
+// SkinnedMesh の morph target に fallback)で適用する。**どの emotion がどの channel を
+// どの比率で点けるか**という表 + クランプは純粋なので Almide に集約=単一の正本。
+// プリセット名と Lime/VRoid 系の granular shape key を**両方重ねがけ**するので、
+// どちらの形式のモデルも安全にカバーされる(無い shape は適用側で no-op)。
+//
+// 適用時の実効重み = channel の比率 × コマンドの weight。string プリセットは比率 1.0。
+// emotion 名は case-insensitive、channel 名は VRM/morph と一致させるため case-sensitive。
+//
+// 移植元: openaituber src/vrm/control.ts の EMOTION_CHANNELS / applyEmotion / clamp01。
+
+import list
+import string
+import float
+
+// 値を [0,1] にクランプ。weight / morph 値の安全装置。
+fn clamp01(v: Float) -> Float = if v < 0.0 then 0.0 else if v > 1.0 then 1.0 else v
+
+// (emotion 名(小文字), [(channel 名, 比率)])。比率はコマンド weight に掛ける。
+fn table() -> List[(String, List[(String, Float)])] = [
+  ("neutral",   [("neutral", 1.0), ("Neutral", 1.0)]),
+  ("happy",     [("happy", 1.0), ("Joy", 1.0), ("joy", 1.0), ("Fun", 1.0), ("fun", 1.0), ("eye_happy", 1.0), ("mouth_smile", 1.0)]),
+  ("angry",     [("angry", 1.0), ("Angry", 1.0), ("eye_angry", 1.0), ("mouth_angry", 1.0)]),
+  ("sad",       [("sad", 1.0), ("Sorrow", 1.0), ("sorrow", 1.0), ("eye_sad", 1.0), ("mouth_down", 0.6)]),
+  ("surprised", [("surprised", 1.0), ("Surprised", 1.0), ("O", 0.9), ("oh", 0.9), ("eye_surprise", 1.0), ("mouth_O", 0.7)]),
+  ("relaxed",   [("relaxed", 1.0), ("Relaxed", 1.0), ("Fun", 1.0), ("fun", 1.0), ("eye_nagomi", 0.8), ("mouth_smile", 0.3)]),
+  ("joy",       [("Joy", 1.0), ("joy", 1.0), ("happy", 1.0), ("Fun", 1.0), ("fun", 1.0), ("eye_happy", 1.0), ("mouth_smile", 1.0)]),
+  ("fun",       [("Fun", 1.0), ("fun", 1.0), ("relaxed", 1.0), ("happy", 1.0), ("eye_happy", 0.7), ("mouth_grin_L", 0.7), ("mouth_grin_R", 0.7)]),
+  ("sorrow",    [("Sorrow", 1.0), ("sorrow", 1.0), ("sad", 1.0), ("eye_sad", 1.0), ("mouth_down", 0.7)]),
+  ("wink",      [("wink", 1.0), ("Wink", 1.0), ("Blink_L", 1.0), ("blinkLeft", 1.0), ("blink", 0.6), ("Blink", 0.6), ("eye_happy_L", 1.0)]),
+  ("blink",     [("blink", 1.0), ("Blink", 1.0), ("vrc.blink", 1.0)]),
+  ("smile",     [("smile", 1.0), ("Smile", 1.0), ("happy", 0.6), ("Joy", 0.6), ("joy", 0.6), ("Fun", 0.5), ("fun", 0.5), ("eye_smile_1", 0.6), ("mouth_smile", 0.5)]),
+  ("shy",       [("shy", 1.0), ("Joy", 0.3), ("happy", 0.3), ("eye_close", 0.4), ("eye_smile_1", 0.4), ("cheek_wide", 1.0), ("mouth_smile", 0.4), ("mouth_~", 0.5)]),
+  ("excited",   [("excited", 1.0), ("Joy", 1.0), ("happy", 1.0), ("eye_pupil_star", 0.8), ("eye_outer_wide_1", 0.6), ("mouth_grin_L", 0.8), ("mouth_grin_R", 0.8), ("cheek_up", 0.5)]),
+  ("laughing",  [("laughing", 1.0), ("Joy", 1.0), ("Fun", 1.0), ("happy", 1.0), ("fun", 1.0), ("eye_happy", 1.0), ("mouth_grin_L", 1.0), ("mouth_grin_R", 1.0), ("cheek_up", 0.4)]),
+  ("crying",    [("crying", 1.0), ("Sorrow", 1.0), ("sad", 1.0), ("eye_sad", 1.0), ("eye_uru", 1.0), ("mouth_down", 0.8)]),
+  ("smug",      [("smug", 1.0), ("Joy", 0.3), ("happy", 0.3), ("eye_jito_1", 0.7), ("mouth_smile", 0.6), ("mouth_up", 0.4)]),
+  ("thinking",  [("thinking", 1.0), ("eye_jito_1", 0.4), ("eye_look_up", 0.4), ("mouth_~", 0.6)]),
+  ("confused",  [("confused", 1.0), ("Sorrow", 0.2), ("sad", 0.2), ("eye_brink_1", 0.3), ("eye_far", 0.4), ("mouth_~", 0.8)]),
+  ("pout",      [("pout", 1.0), ("Angry", 0.2), ("Sorrow", 0.2), ("cheek_puku-", 1.0), ("mouth_straight", 0.5), ("mouth_V", 0.5), ("eye_jito_1", 0.4)]),
+  ("jitome",    [("jitome", 1.0), ("Angry", 0.15), ("eye_jito_1", 1.0), ("mouth_straight", 0.4)]),
+]
+
+local fn scan(t: List[(String, List[(String, Float)])], emo: String, i: Int) -> List[(String, Float)] = {
+  let empty: List[(String, Float)] = []
+  match list.get(t, i) {
+    none      => empty,
+    some(row) => if row.0 == emo then row.1 else scan(t, emo, i + 1),
+  }
+}
+
+// emotion 名 → 適用 channel の (名前, 比率) リスト。未知の emotion は空。
+fn channels_for(emotion: String) -> List[(String, Float)] = scan(table(), string.to_lower(emotion), 0)
+
+// channel リストを JSON 配列にする: [{"n":"eye_happy","w":1.0}, ...]。
+// ブラウザは各要素を setMorphOrExpression(n, clamp01(w * weight)) で適用する。
+fn channels_json(emotion: String) -> String = {
+  let chs = channels_for(emotion)
+  let items = list.map(chs, (c) => "{\"n\":\"" + c.0 + "\",\"w\":" + float.to_string(c.1) + "}")
+  "[" + string.join(items, ",") + "]"
+}
