@@ -62,5 +62,5 @@ fn channels_for(emotion: String) -> List[(String, Float)] = scan(table(), string
 fn channels_json(emotion: String) -> String = {
   let chs = channels_for(emotion)
   let items = list.map(chs, (c) => "{\"n\":\"" + c.0 + "\",\"w\":" + float.to_string(c.1) + "}")
-  "[" + string.join(items, ",") + "]"
+  "[" + list.join(items, ",") + "]"
 }

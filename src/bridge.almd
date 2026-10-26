@@ -11,15 +11,15 @@ import int
 import list
 import string
 
-var g_in: Bytes = bytes.new(0)
-var g_out: Bytes = bytes.new(0)
+var g_in: Bytes = bytes.zeros(0)
+var g_out: Bytes = bytes.zeros(0)
 
 @export(wasm, "ex_clamp")
 fn ex_clamp(v: Float) -> Float = ex.clamp01(v)
 
 @export(wasm, "ex_in_alloc")
 fn ex_in_alloc(len: Float) -> RawPtr = {
-  g_in = bytes.new(float.to_int(len))
+  g_in = bytes.zeros(int.from_saturating(len))
   bytes.as_mut_ptr(g_in)
 }
 
@@ -28,7 +28,7 @@ fn ex_resolve() -> Float = {
   let s = ex.channels_json(bytes.to_string_lossy(g_in))
   g_out = bytes.from_string(s)
   // 実バイト長を返す (bytes.len は確保 capacity を返すため、文字列から数える)。
-  int.to_float(list.len(string.to_bytes(s)))
+  float.from(list.len(bytes.to_list(bytes.from_string(s))))
 }
 
 @export(wasm, "ex_out_ptr")
