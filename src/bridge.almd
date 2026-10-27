@@ -6,6 +6,7 @@
 // almide#440 対策で main から全 export を参照。
 import self as ex
 import bytes
+import ffi
 import float
 import int
 import list
@@ -20,7 +21,7 @@ fn ex_clamp(v: Float) -> Float = ex.clamp01(v)
 @export(wasm, "ex_in_alloc")
 fn ex_in_alloc(len: Float) -> RawPtr = {
   g_in = bytes.zeros(int.from_saturating(len))
-  bytes.as_mut_ptr(g_in)
+  ffi.address(g_in)
 }
 
 @export(wasm, "ex_resolve")
@@ -32,7 +33,7 @@ fn ex_resolve() -> Float = {
 }
 
 @export(wasm, "ex_out_ptr")
-fn ex_out_ptr() -> RawPtr = bytes.as_mut_ptr(g_out)
+fn ex_out_ptr() -> RawPtr = ffi.address(g_out)
 
 effect fn main() -> Unit = {
   let _c = ex_clamp(0.5)
