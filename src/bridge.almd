@@ -10,7 +10,6 @@ import ffi
 import float
 import int
 import list
-import string
 
 var g_in: Region = ffi.region(bytes.new())
 var g_out: Bytes = bytes.zeros(0)
