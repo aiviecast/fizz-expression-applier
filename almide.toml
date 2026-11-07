@@ -1,4 +1,4 @@
 [package]
 name = "fizz_expression_applier"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fizz expression applier — map an emotion name to its VRM expression / raw-morph channels (with weights), plus value clamping. One Almide core, native + wasm."
